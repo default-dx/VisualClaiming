@@ -123,7 +123,8 @@ public class ChunkClaimingRenderLayer extends RenderLayer {
         List<String> tooltips = new ArrayList<>();
         if (hoveredChunk != null) {
             tooltips.addAll(hoveredChunk.tooltips);
-        } else {
+        }
+        if (selectedChunk != null && hoveredChunk == null) {
             tooltips.add("Wilderness");
         }
         return tooltips.isEmpty() ? null : tooltips;
