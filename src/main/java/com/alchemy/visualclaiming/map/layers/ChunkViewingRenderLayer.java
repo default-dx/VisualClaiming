@@ -1,55 +1,38 @@
 package com.alchemy.visualclaiming.map.layers;
 
-import com.alchemy.visualclaiming.VisualClaiming;
-import com.alchemy.visualclaiming.map.DrawUtilsExtra;
 import com.alchemy.visualclaiming.database.FTBChunkClaimPosition;
 import com.alchemy.visualclaiming.database.VCClientCache;
+import com.alchemy.visualclaiming.map.DrawUtilsExtra;
 import com.feed_the_beast.ftblib.lib.client.ClientUtils;
 import com.feed_the_beast.ftblib.lib.gui.misc.ChunkSelectorMap;
 import com.feed_the_beast.ftbutilities.events.chunks.UpdateClientDataEvent;
 import com.feed_the_beast.ftbutilities.gui.ClientClaimedChunks;
-import com.feed_the_beast.ftbutilities.net.MessageClaimedChunksModify;
 import com.feed_the_beast.ftbutilities.net.MessageClaimedChunksUpdate;
 import hellfall.visualores.map.DrawUtils;
 import hellfall.visualores.map.layers.RenderLayer;
 import it.unimi.dsi.fastutil.longs.Long2ShortOpenHashMap;
-import net.minecraft.client.Minecraft;
-import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.util.ResourceLocation;
 import net.minecraft.util.math.ChunkPos;
 import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
-import org.apache.logging.log4j.Level;
-import org.lwjgl.input.Keyboard;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
 
 
 @Mod.EventBusSubscriber()
-public class ChunkClaimingRenderLayer extends RenderLayer {
+public class ChunkViewingRenderLayer extends RenderLayer {
+    private static boolean dirty = false;
     public List<FTBChunkClaimPosition> visibleChunks = new ArrayList<>();
-    public static boolean dirty = false;
-
-    private int lastDimensionID;
-    private int[] lastVisibleBounds;
     private Long2ShortOpenHashMap claimedMap = new Long2ShortOpenHashMap();
     private FTBChunkClaimPosition hoveredChunk;
-    private ChunkPos selectedChunk;
-    public ChunkClaimingRenderLayer(String key) {
+    public ChunkViewingRenderLayer(String key) {
         super(key);
     }
 
     @Override
     public void render(double cameraX, double cameraZ, double scale) {
-        if (dirty && lastVisibleBounds != null) {
-            updateVisibleArea(lastDimensionID, lastVisibleBounds);
-        }
-        EntityPlayer player = Minecraft.getMinecraft().player;
-        if (player != null) {
-            int playerX = player.chunkCoordX;
-            int playerZ = player.chunkCoordZ;
-            DrawUtils.drawOverlayBox((playerX - 7) * 16, (playerZ - 7) * 16, (playerX + 8) * 16, (playerZ + 8) * 16,0xFFFFFFFF ,0x00000000);
-        };
         for (FTBChunkClaimPosition chunk : visibleChunks) {
             int teamColor = (chunk.teamColor & 0x00FFFFFF) + 0x77000000;
             DrawUtils.drawOverlayBox(chunk.x, chunk.z, teamColor, teamColor);
@@ -67,31 +50,18 @@ public class ChunkClaimingRenderLayer extends RenderLayer {
 
     @Override
     public void updateVisibleArea(int dimensionID, int[] visibleBounds) {
-        lastDimensionID = dimensionID;
-        lastVisibleBounds = visibleBounds;
         visibleChunks = VCClientCache.instance.getChunkClaimsInArea(dimensionID, visibleBounds);
         claimedMap = new Long2ShortOpenHashMap(visibleChunks.size());
         claimedMap.defaultReturnValue((short) -1);
         for (FTBChunkClaimPosition chunk : visibleChunks) {
             claimedMap.put(pack(chunk.x, chunk.z), chunk.uid);
         }
-        dirty = false;
     }
 
     @Override
     public void updateHovered(double mouseX, double mouseY, double cameraX, double cameraZ, double scale) {
         ChunkPos mousePos = new ChunkPos(DrawUtils.getMouseBlockPos(mouseX, mouseY, cameraX, cameraZ, scale));
         hoveredChunk = null;
-        selectedChunk = null;
-
-        EntityPlayer player = Minecraft.getMinecraft().player;
-        if (player != null) {
-            int playerX = player.chunkCoordX;
-            int playerZ = player.chunkCoordZ;
-            if ((mousePos.x >= playerX - 7 && mousePos.x <= playerX + 7) && (mousePos.z >= playerZ - 7 && mousePos.z <= playerZ + 7)) {
-                selectedChunk = mousePos;
-            }
-        }
         for (FTBChunkClaimPosition chunkClaimPosition : visibleChunks) {
             if (chunkClaimPosition.x == mousePos.x && chunkClaimPosition.z == mousePos.z) {
                 hoveredChunk = chunkClaimPosition;
@@ -101,32 +71,11 @@ public class ChunkClaimingRenderLayer extends RenderLayer {
     }
 
     @Override
-    public boolean onClick() {
-        boolean shiftHeld = Keyboard.isKeyDown(Keyboard.KEY_LSHIFT) || Keyboard.isKeyDown(Keyboard.KEY_RSHIFT);
-        boolean ctrlHeld  = Keyboard.isKeyDown(Keyboard.KEY_LCONTROL) || Keyboard.isKeyDown(Keyboard.KEY_RCONTROL);
-        int selectionMode;
-        if (ctrlHeld) {
-            selectionMode = shiftHeld ? MessageClaimedChunksModify.UNLOAD : MessageClaimedChunksModify.LOAD;
-        } else {
-            selectionMode = shiftHeld ? MessageClaimedChunksModify.UNCLAIM : MessageClaimedChunksModify.CLAIM;
-        }
-        if (selectedChunk != null) {
-            Collection<ChunkPos> chunks = Collections.singleton(selectedChunk);
-            new MessageClaimedChunksModify(selectedChunk.x, selectedChunk.z, selectionMode, chunks).sendToServer();
-            return true;
-        };
-        return false;
-    }
-
-    @Override
     public List<String> getTooltip() {
-        List<String> tooltips = new ArrayList<>();
         if (hoveredChunk != null) {
-            tooltips.addAll(hoveredChunk.tooltips);
-        } else {
-            tooltips.add("Wilderness");
+            return hoveredChunk.tooltips;
         }
-        return tooltips.isEmpty() ? null : tooltips;
+        return null;
     }
 
     private static long pack(int x, int z) {
@@ -171,4 +120,5 @@ public class ChunkClaimingRenderLayer extends RenderLayer {
         }
         dirty = true;
     }
+
 }

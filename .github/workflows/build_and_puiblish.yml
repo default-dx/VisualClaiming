@@ -1,5 +1,5 @@
 # This workflow must be manually triggered. It accepts a version and a release type.
-# First it sets the version in gradle.properties to the new version and pushes it.
+# First it sets the version in buildscript.properties to the new version and pushes it.
 # Then it generates a log, based on commits.
 # After that builds a jar and uploads it to curseforge/modrinth/GitHub releases
 
@@ -87,15 +87,15 @@ jobs:
 
       - name: Set version
         if: env.UPDATED == 'false' # only change new version if it's not already updated
-        run: sed -i "s/modVersion.*=.*/modVersion = ${{ github.event.inputs.version }}/g" gradle.properties
+        run: sed -i "s/modVersion.*=.*/modVersion = ${{ github.event.inputs.version }}/g" buildscript.properties
 
-      - name: Commit and push gradle.properties
+      - name: Commit and push buildscript.properties
         if: env.UPDATED == 'false' # only push new version if it's not already updated
         uses: stefanzweifel/git-auto-commit-action@v5.0.1
         with:
           commit_message: "Bump version to ${{ github.event.inputs.version }}"
           commit_options: "--no-verify"
-          file_pattern: gradle.properties
+          file_pattern: buildscript.properties
           tagging_message: "v${{ github.event.inputs.version }}"
 
       - name: Check for publishing
