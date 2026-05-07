@@ -3,32 +3,29 @@ package com.alchemy.visualclaiming.map.layers;
 import com.alchemy.visualclaiming.database.FTBChunkClaimPosition;
 import com.alchemy.visualclaiming.database.VCClientCache;
 import com.alchemy.visualclaiming.map.DrawUtilsExtra;
-import com.feed_the_beast.ftblib.lib.client.ClientUtils;
-import com.feed_the_beast.ftblib.lib.gui.misc.ChunkSelectorMap;
-import com.feed_the_beast.ftbutilities.events.chunks.UpdateClientDataEvent;
-import com.feed_the_beast.ftbutilities.gui.ClientClaimedChunks;
-import com.feed_the_beast.ftbutilities.net.MessageClaimedChunksUpdate;
 import hellfall.visualores.map.DrawUtils;
 import hellfall.visualores.map.layers.RenderLayer;
 import it.unimi.dsi.fastutil.longs.Long2ShortOpenHashMap;
 import net.minecraft.util.ResourceLocation;
 import net.minecraft.util.math.ChunkPos;
-import net.minecraftforge.fml.common.Mod;
-import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 
-
-@Mod.EventBusSubscriber()
 public class ChunkViewingRenderLayer extends RenderLayer {
-    private static boolean dirty = false;
-    public List<FTBChunkClaimPosition> visibleChunks = new ArrayList<>();
+
+    public static ChunkViewingRenderLayer instance;
+
+    private List<FTBChunkClaimPosition> visibleChunks = new ArrayList<>();
     private Long2ShortOpenHashMap claimedMap = new Long2ShortOpenHashMap();
     private FTBChunkClaimPosition hoveredChunk;
+    private int lastDimensionID;
+    private int[] lastVisibleBounds;
+    private boolean dirty = false;
+
     public ChunkViewingRenderLayer(String key) {
         super(key);
+        instance = this;
     }
 
     @Override
@@ -44,27 +41,24 @@ public class ChunkViewingRenderLayer extends RenderLayer {
                     !isSameTeam(chunk.x,     chunk.z + 1, chunk.uid),
                     !isSameTeam(chunk.x - 1, chunk.z,     chunk.uid),
                     !isSameTeam(chunk.x + 1, chunk.z,     chunk.uid),
-                    (chunk.teamColor));
+                    chunk.teamColor);
         }
     }
 
     @Override
     public void updateVisibleArea(int dimensionID, int[] visibleBounds) {
-        visibleChunks = VCClientCache.instance.getChunkClaimsInArea(dimensionID, visibleBounds);
-        claimedMap = new Long2ShortOpenHashMap(visibleChunks.size());
-        claimedMap.defaultReturnValue((short) -1);
-        for (FTBChunkClaimPosition chunk : visibleChunks) {
-            claimedMap.put(pack(chunk.x, chunk.z), chunk.uid);
-        }
+        lastDimensionID = dimensionID;
+        lastVisibleBounds = visibleBounds;
+        refresh();
     }
 
     @Override
     public void updateHovered(double mouseX, double mouseY, double cameraX, double cameraZ, double scale) {
         ChunkPos mousePos = new ChunkPos(DrawUtils.getMouseBlockPos(mouseX, mouseY, cameraX, cameraZ, scale));
         hoveredChunk = null;
-        for (FTBChunkClaimPosition chunkClaimPosition : visibleChunks) {
-            if (chunkClaimPosition.x == mousePos.x && chunkClaimPosition.z == mousePos.z) {
-                hoveredChunk = chunkClaimPosition;
+        for (FTBChunkClaimPosition chunk : visibleChunks) {
+            if (chunk.x == mousePos.x && chunk.z == mousePos.z) {
+                hoveredChunk = chunk;
                 break;
             }
         }
@@ -72,53 +66,30 @@ public class ChunkViewingRenderLayer extends RenderLayer {
 
     @Override
     public List<String> getTooltip() {
-        if (hoveredChunk != null) {
-            return hoveredChunk.tooltips;
-        }
-        return null;
+        return hoveredChunk != null ? hoveredChunk.tooltips : null;
     }
 
-    private static long pack(int x, int z) {
-        return ((long) x << 32) | (z & 0xFFFFFFFFL);
+    public void refresh() {
+        if (lastVisibleBounds == null) return;
+        visibleChunks = VCClientCache.instance.getChunkClaimsInArea(lastDimensionID, lastVisibleBounds);
+        claimedMap = new Long2ShortOpenHashMap(visibleChunks.size());
+        claimedMap.defaultReturnValue((short) -1);
+        for (FTBChunkClaimPosition chunk : visibleChunks) {
+            claimedMap.put(pack(chunk.x, chunk.z), chunk.uid);
+        }
+        dirty = false;
     }
+
+    public void markDirty() {
+        dirty = true;
+    }
+
 
     private boolean isSameTeam(int x, int z, short uid) {
         return claimedMap.get(pack(x, z)) == uid;
     }
 
-    @SubscribeEvent
-    public static void onDataReceived(UpdateClientDataEvent event) {
-        MessageClaimedChunksUpdate message = event.getMessage();
-        int dim = ClientUtils.getDim();
-        ClientClaimedChunks.ChunkData[] data = new ClientClaimedChunks.ChunkData[ChunkSelectorMap.TILES_GUI * ChunkSelectorMap.TILES_GUI];
-        for (ClientClaimedChunks.Team team : message.teams.values()) {
-            for (Map.Entry<Integer, ClientClaimedChunks.ChunkData> entry : team.chunks.entrySet())
-            {
-                int x = entry.getKey() % ChunkSelectorMap.TILES_GUI;
-                int z = entry.getKey() / ChunkSelectorMap.TILES_GUI;
-                ClientClaimedChunks.ChunkData chunkData = entry.getValue();
-                data[x + z * ChunkSelectorMap.TILES_GUI] = chunkData;
-            }
-        }
-
-        for (int z = 0; z < ChunkSelectorMap.TILES_GUI; z++)
-        {
-            for (int x = 0; x < ChunkSelectorMap.TILES_GUI; x++)
-            {
-                ChunkPos pos = new ChunkPos(message.startX + x, message.startZ + z);
-                ClientClaimedChunks.ChunkData chunkData = data[x + z * ChunkSelectorMap.TILES_GUI];
-                if (chunkData == null) {
-                    VCClientCache.instance.removeChunkData(dim, pos);
-                } else {
-                    VCClientCache.instance.addChunkData(dim, pos,
-                            chunkData.team.uid,
-                            chunkData.flags,
-                            chunkData.team.color.getColor().hashCode(),
-                            chunkData.team.nameComponent.getFormattedText());
-                }
-            }
-        }
-        dirty = true;
+    private static long pack(int x, int z) {
+        return ((long) x << 32) | (z & 0xFFFFFFFFL);
     }
-
 }
