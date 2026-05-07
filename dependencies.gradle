@@ -52,7 +52,4 @@ dependencies {
     implementation rfg.deobf("curse.maven:ftb-utilities-forge-237102:3157548")
     implementation rfg.deobf("curse.maven:ftb-library-legacy-forge-237167:2985811")
 
-    //Example
-    runtimeOnly ('gregtech:gregtech:2.8.10-beta') { transitive = false }
-
 }
