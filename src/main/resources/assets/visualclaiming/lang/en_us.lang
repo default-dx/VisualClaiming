@@ -1,4 +1,6 @@
-visualores.button.chunk_claiming=Toggle claimed chunk display
+visualores.button.chunk_claiming=Toggle FTB Utilities chunk display with claiming abilities
+visualores.button.chunk_viewing=Toggle FTB Utilities chunk display only
 
 visualclaiming.team=Claimed by: %s
-visualclaiming.chunkedloaded=Chunkloaded
+visualclaiming.chunkedloaded=§cChunkloaded
+visualclaiming.wilderness=§2Wilderness

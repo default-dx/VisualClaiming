@@ -9,6 +9,7 @@ import hellfall.visualores.map.layers.RenderLayer;
 import it.unimi.dsi.fastutil.longs.Long2ShortOpenHashMap;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.audio.PositionedSoundRecord;
+import net.minecraft.client.resources.I18n;
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.init.SoundEvents;
 import net.minecraft.util.ResourceLocation;
@@ -117,7 +118,7 @@ public class ChunkClaimingRenderLayer extends RenderLayer {
         if (hoveredChunk != null) {
             tooltips.addAll(hoveredChunk.tooltips);
         } else if (selectedChunk != null) {
-            tooltips.add("Wilderness");
+            tooltips.add(I18n.format("visualclaiming.wilderness"));
         }
         return tooltips.isEmpty() ? null : tooltips;
     }
